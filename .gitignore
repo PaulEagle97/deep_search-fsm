@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+
+# PDM
+.pdm.toml
+.pdm-python
+.pdm-build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables - ignore actual .env files with secrets
+*.env
+!*.env.example

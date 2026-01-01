@@ -1,0 +1,15 @@
+[project]
+name = "deep_search-fsm"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Pavel Orlov", email = "pauleagle97@gmail.com"},
+]
+dependencies = ["burr[start]>=0.40.2", "haystack-ai>=2.21.0"]
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
