@@ -1,3 +1,1 @@
-from .config import weaviate_config, azure_config
-
-__all__ = ["weaviate_config", "azure_config"]
+from .config import jina_config, azure_config

@@ -8,6 +8,7 @@ from haystack.dataclasses import ChatMessage, ChatRole, StreamingCallbackT
 from ..models import ApplicationState
 from ..nlp import build_openai_generator_pipe
 from ..tools import CURRENT_TOOLS, init_tool_invoker
+from ..prompts import sys_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,9 @@ def human_input(
         query = input("Type your question:\n")
 
     user_message = ChatMessage.from_user(query)
+    sys_message = ChatMessage.from_system(sys_prompt)
 
-    state.chat_history.append(user_message)
+    state.chat_history.extend([sys_message, user_message])
     return state
 
 

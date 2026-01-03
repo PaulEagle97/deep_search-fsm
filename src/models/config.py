@@ -19,3 +19,12 @@ class AzureOpenAISettings(BaseSettings):
         env_prefix="AZURE_",
         env_file="azure.env"
     )
+
+
+class JinaSettings(BaseSettings):
+    API_KEY: str
+
+    model_config = SettingsConfigDict(
+        env_prefix="JINA_",
+        env_file="jina.env",
+    )

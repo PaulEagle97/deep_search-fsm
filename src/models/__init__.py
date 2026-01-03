@@ -1,2 +1,3 @@
 from .fsm import ApplicationState
-from .config import WeaviateSettings, OpenAISettings
+from .config import OpenAISettings, JinaSettings, AzureOpenAISettings
+from .jina import ScrapedWebPage, JinaReaderSearchResult
