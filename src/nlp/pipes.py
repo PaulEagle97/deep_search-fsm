@@ -15,7 +15,7 @@ def build_openai_generator_pipe() -> Tuple[Pipeline, Callable, Callable]:
     llm = AzureOpenAIChatGenerator(
         api_key=Secret.from_token(azure_config.OPENAI_API_KEY),
         azure_endpoint=azure_config.OPENAI_ENDPOINT,
-        azure_deployment="gpt-4o-mini-service",
+        azure_deployment=azure_config.DEPLOYMENT_NAME,
     )
 
     pipe = Pipeline()
