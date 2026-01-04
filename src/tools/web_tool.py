@@ -16,7 +16,7 @@ from ..models import JinaReaderSearchResult, ScrapedWebPage
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_MAX_RESULTS = 5
+DEFAULT_MAX_RESULTS = 3
 
 
 def jina_search(query: str, *, max_results: int = DEFAULT_MAX_RESULTS) -> JinaReaderSearchResult:
@@ -92,7 +92,15 @@ def search_web(
     """
     Performs a web search and returns scraped web page texts.
     """
+    logger.info(f"Calling Jina API with query='{query}'")
     search_result = jina_search(query)
+    if search_result.success:
+        logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
+    else:
+        logger.warning(f"Failure to call Jina API")
+
+    logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
+
     formatted_strs = jina_result_to_formatted_strs(search_result)
 
     return formatted_strs
