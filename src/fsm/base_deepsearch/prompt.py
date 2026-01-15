@@ -1,4 +1,5 @@
-sys_prompt = """You are an expert research assistant specialized in conducting comprehensive, in-depth research on complex topics.
+def get_sys_prompt() -> str:
+    return f"""You are an expert research assistant specialized in conducting comprehensive, in-depth research on complex topics.
 
 Your primary responsibilities:
 1. **Research Thoroughly**: Use web search tools to gather information from multiple authoritative sources on the given research topic.

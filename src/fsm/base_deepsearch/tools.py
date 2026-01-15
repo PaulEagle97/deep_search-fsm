@@ -10,16 +10,14 @@ from rich.logging import RichHandler
 from haystack.tools import create_tool_from_function
 from haystack.components.tools import ToolInvoker
 
-from ..core import jina_config
-from ..models import JinaReaderSearchResult, ScrapedWebPage
+from ...core import jina_config
+from ...models import JinaReaderSearchResult, ScrapedWebPage
+from .config import fsm_config
 
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_MAX_RESULTS = 3
-
-
-def jina_search(query: str, *, max_results: int = DEFAULT_MAX_RESULTS) -> JinaReaderSearchResult:
+def jina_search(query: str, max_results: int) -> JinaReaderSearchResult:
     base_url = "https://s.jina.ai/"
     
     # Build query parameters
@@ -93,7 +91,11 @@ def search_web(
     Performs a web search and returns scraped web page texts.
     """
     logger.info(f"Calling Jina API with query='{query}'")
-    search_result = jina_search(query)
+
+    # SHORT CIRCUIT FOR TESTING
+    # return ["Web Search failed due to the rate limits."]
+
+    search_result = jina_search(query, fsm_config.MAX_PAGES_PER_WEBSEARCH)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
     else:

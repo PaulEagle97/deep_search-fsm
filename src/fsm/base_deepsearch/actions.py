@@ -5,10 +5,10 @@ from burr.core import action
 
 from haystack.dataclasses import ChatMessage, ChatRole, StreamingCallbackT
 
-from ..models import ApplicationState
-from ..nlp import build_openai_generator_pipe
-from ..tools import CURRENT_TOOLS, init_tool_invoker
-from ..prompts import sys_prompt
+from .models import ApplicationState
+from ...nlp import build_openai_generator_pipe
+from .tools import CURRENT_TOOLS, init_tool_invoker
+from .prompt import get_sys_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
         "chat_history",
     ],
 )
-def human_input(
+def build_chat_msgs(
     state: ApplicationState,
     query: Optional[str] = None,
 ) -> ApplicationState:
@@ -27,7 +27,7 @@ def human_input(
         query = input("Type your question:\n")
 
     user_message = ChatMessage.from_user(query)
-    sys_message = ChatMessage.from_system(sys_prompt)
+    sys_message = ChatMessage.from_system(get_sys_prompt())
 
     state.chat_history.extend([sys_message, user_message])
     return state
@@ -55,6 +55,7 @@ def ai_response(
                         "streaming_callback": streaming_callback,
                         "generation_kwargs": {
                             "tool_choice": "none" if state.counter >= max_iterations else "auto",
+                            "reasoning_effort": "minimal",
                         },
                         "tools": CURRENT_TOOLS,
                         "tools_strict": True,
@@ -105,7 +106,6 @@ def tool_invocation(
 @action.pydantic(
     reads=[
         "counter",
-        "chat_history"
     ],
     writes=[
     ],
