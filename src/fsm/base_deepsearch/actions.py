@@ -5,9 +5,10 @@ from burr.core import action
 
 from haystack.dataclasses import ChatMessage, ChatRole, StreamingCallbackT
 
-from .models import ApplicationState
 from ...nlp import build_openai_generator_pipe
-from .tools import CURRENT_TOOLS, init_tool_invoker
+from ...tools import init_tool_invoker
+from .models import ApplicationState
+from .config import CURRENT_TOOLS
 from .prompt import get_sys_prompt
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ def tool_invocation(
         state.should_continue = False
         return state
 
-    tool_invoker = init_tool_invoker()
+    tool_invoker = init_tool_invoker(CURRENT_TOOLS)
     tool_invoker_result = tool_invoker.run(
         messages=[ass_msg]
     )

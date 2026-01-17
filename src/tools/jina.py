@@ -1,18 +1,14 @@
 import logging
 import requests
 from urllib.parse import urlencode
-from typing import Any, List, Dict, Annotated, Optional
+from typing import List, Dict, Annotated, Optional
 
 import pydantic
 
 from rich.logging import RichHandler
 
-from haystack.tools import create_tool_from_function
-from haystack.components.tools import ToolInvoker
-
-from ...core import jina_config
-from ...models import JinaReaderSearchResult, ScrapedWebPage
-from .config import fsm_config
+from ..core import jina_config
+from ..models import JinaReaderSearchResult, ScrapedWebPage
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +25,7 @@ def jina_search(query: str, max_results: int) -> JinaReaderSearchResult:
     
     headers = {
         "Accept": "application/json",
-        "Authorization": f"Bearer {jina_config.API_KEY}",
+        "Authorization": f"Bearer {jina_config.envs.API_KEY}",
         "X-Retain-Images": "none",
         # to add "links" section with aggregated links per page
         # "X-With-Links-Summary": "true",
@@ -52,6 +48,7 @@ def jina_search(query: str, max_results: int) -> JinaReaderSearchResult:
         ]
 
         return JinaReaderSearchResult(
+            query=query,
             success=True,
             scraped_pages=pages,
             total_used_tokens=search_results["meta"]["usage"]["tokens"]
@@ -63,7 +60,10 @@ def jina_search(query: str, max_results: int) -> JinaReaderSearchResult:
     except pydantic.ValidationError:
         logger.exception("Jina API response parsing failed")
 
-    return JinaReaderSearchResult(success=False)
+    return JinaReaderSearchResult(
+        query=query,
+        success=False,
+    )
 
 
 def jina_result_to_formatted_strs(search_result: JinaReaderSearchResult) -> List[str]:
@@ -84,7 +84,7 @@ def jina_result_to_formatted_strs(search_result: JinaReaderSearchResult) -> List
     return formatted_pages
 
 
-def search_web(
+def search_web_formatted_str_out(
     query: Annotated[str, "A query to be searched in the web"],
 ) -> List[Optional[str]]:
     """
@@ -95,7 +95,7 @@ def search_web(
     # SHORT CIRCUIT FOR TESTING
     # return ["Web Search failed due to the rate limits."]
 
-    search_result = jina_search(query, fsm_config.MAX_PAGES_PER_WEBSEARCH)
+    search_result = jina_search(query, jina_config.NUM_PAGES_PER_SEARCH)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
     else:
@@ -108,23 +108,26 @@ def search_web(
     return formatted_strs
 
 
-web_search_tool = create_tool_from_function(
-    function=search_web,
-)
+def search_web_structured_out(
+    query: Annotated[str, "A query to be searched in the web"],
+) -> Dict:
+    """
+    Performs a web search and returns scraped web pages as dictionaries.
+    """
+    logger.info(f"Calling Jina API with query='{query}'")
 
-CURRENT_TOOLS = [web_search_tool]
+    # SHORT CIRCUIT FOR TESTING
+    # return ["Web Search failed due to the rate limits."]
 
+    search_result = jina_search(query, jina_config.NUM_PAGES_PER_SEARCH)
+    if search_result.success:
+        logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
+    else:
+        logger.warning(f"Failure to call Jina API")
 
-def init_tool_invoker(
-    raise_on_tool_invocation_failure: bool = False,
-    tool_invoker_kwargs: Optional[Dict[str, Any]] = None,
-) -> ToolInvoker:
-    resolved_tool_invoker_kwargs = {
-        "tools": CURRENT_TOOLS,
-        "raise_on_failure": raise_on_tool_invocation_failure,
-        **(tool_invoker_kwargs or {}),
-    }
-    return ToolInvoker(**resolved_tool_invoker_kwargs)
+    logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
+
+    return search_result.model_dump()
 
 
 if __name__ == "__main__":
@@ -143,7 +146,7 @@ if __name__ == "__main__":
     )
 
     query = input("Enter your query for web search:\n")
-    result = search_web(query)
+    result = search_web_formatted_str_out(query)
 
     with open("jina_output.txt", "w") as f:
         f.write('\n\n'.join(result))

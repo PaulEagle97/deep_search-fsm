@@ -1,4 +1,8 @@
-from ..models import AzureOpenAISettings, JinaSettings
+from pathlib import Path
+
+from ..models import AzureOpenAISettings, JinaConfig
 
 azure_config = AzureOpenAISettings()
-jina_config = JinaSettings()
+
+jina_config_path = Path(__file__).parent / "jina.yaml"
+jina_config = JinaConfig.from_yaml(jina_config_path)

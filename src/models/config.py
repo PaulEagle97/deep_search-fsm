@@ -1,3 +1,7 @@
+import yaml
+from pathlib import Path
+
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,10 +25,25 @@ class AzureOpenAISettings(BaseSettings):
     )
 
 
-class JinaSettings(BaseSettings):
+class JinaEnvs(BaseSettings):
     API_KEY: str
 
     model_config = SettingsConfigDict(
         env_prefix="JINA_",
         env_file="jina.env",
     )
+
+
+class JinaConfig(BaseModel):
+    envs: JinaEnvs = Field(default_factory=JinaEnvs)
+    NUM_PAGES_PER_SEARCH: int
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> "JinaConfig":
+        p = Path(path)
+        if p.suffix.lower() not in {".yaml", ".yml"}:
+            raise ValueError("The file must have a YAML extension")
+
+        data = yaml.safe_load(p.read_text(encoding="utf-8"))
+
+        return cls.model_validate(data)

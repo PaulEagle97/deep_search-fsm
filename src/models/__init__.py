@@ -1,2 +1,2 @@
-from .config import OpenAISettings, AzureOpenAISettings, JinaSettings
+from .config import OpenAISettings, AzureOpenAISettings, JinaConfig
 from .jina import ScrapedWebPage, JinaReaderSearchResult

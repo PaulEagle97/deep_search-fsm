@@ -11,6 +11,7 @@ class ScrapedWebPage(BaseModel):
 
 
 class JinaReaderSearchResult(BaseModel):
+    query: str
     success: bool
     scraped_pages: List[ScrapedWebPage] = []
     total_used_tokens: int = 0
