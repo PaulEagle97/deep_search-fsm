@@ -116,9 +116,6 @@ def search_web_structured_out(
     """
     logger.info(f"Calling Jina API with query='{query}'")
 
-    # SHORT CIRCUIT FOR TESTING
-    # return ["Web Search failed due to the rate limits."]
-
     search_result = jina_search(query, jina_config.NUM_PAGES_PER_SEARCH)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
@@ -127,7 +124,9 @@ def search_web_structured_out(
 
     logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
 
-    return search_result.model_dump()
+    return search_result.model_dump(mode='json')
+
+
 
 
 if __name__ == "__main__":

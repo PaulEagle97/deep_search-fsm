@@ -1,5 +1,7 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, HttpUrl
+
+from .llm import PageEvaluation
 
 
 class ScrapedWebPage(BaseModel):
@@ -8,6 +10,7 @@ class ScrapedWebPage(BaseModel):
     description: str
     content: str
     used_tokens: int
+    llm_eval: Optional[PageEvaluation] = None
 
 
 class JinaReaderSearchResult(BaseModel):
