@@ -40,13 +40,13 @@ def build_burr_app(visualize: bool = False) -> Application:
         .with_typing(PydanticTypingSystem(ApplicationState))
         .with_state(ApplicationState())
         .with_entrypoint("build_chat_msgs")
-        .with_tracker(project="demo_getting_started")
+        .with_tracker(project="base_deepsearch")
         .build()
     )
 
     if visualize:
         app.visualize(
-            output_file_path="./burr_app.png",
+            output_file_path="./base_deepsearch_app.png",
             include_conditions=True,
         )
 
