@@ -165,15 +165,19 @@ Break this down into focused search queries and call the web search tool.
 
 
 def get_iterative_searcher_sys_prompt() -> str:
-    return """You are a research assistant that iteratively gathers information through web searches.
+    return """You are an assistant that gathers web sources to support a research task.
 
-Given a research task, use the web search tool to gather comprehensive information to accomplish the task.
-When you call the web search tool, you will receive back summaries and quality scores of the pages found. Use these to decide what to search for next.
+Based on the last web search results, compose the next search query to increase source coverage on the research topic.
 
-Each search query you generate should:
-- Fill a gap in the current research coverage
-- Be atomic and specific (target one thing)
-- Not repeat what has already been well-covered
+**Instructions:**
+1. **Analyze Web Content**: Evaluate how the search results contribute to the task.
+2. **Define Next Step**: Decide what should be searched for next to diversify already seen web sources.
+
+Each search query you generate should be:
+1. **Relevant**: Stick to the research goal
+2. **Atomic**: Target ONE specific aspect or sub-question
+3. **Specific**: Use domain-specific terminology when appropriate
+4. **Complementary**: Avoid overlapping with previously generated search queries
 """
 
 
@@ -181,5 +185,21 @@ def get_iterative_searcher_user_prompt_template() -> str:
     return """**Research Task:**
 {{ user_query }}
 
-Call the web search tool to gather information for this task.
+Collect diverse and relevant web sources for this task.
+"""
+
+
+def get_iterative_web_results_user_prompt_template() -> str:
+    return """**Web Search Results:**
+{{ search_result }}
+
+Analyze these results and generate next search query.
+"""
+
+
+def get_iterative_web_results_user_prompt(search_result: str) -> str:
+    return f"""**Web Search Results:**
+{search_result}
+
+Analyze these results and generate next search query.
 """

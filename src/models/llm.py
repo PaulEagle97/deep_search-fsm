@@ -21,3 +21,9 @@ class PageEvaluation(BaseModel):
 class PageEvaluationSeparate(BaseModel):
     relevance_evaluation: PageRelevanceEvaluation
     depth_evaluation: PageDepthEvaluation
+
+
+class SearchReasoning(BaseModel):
+    search_result_evaluation: str
+    next_search_query: str
+    # should_continue: bool

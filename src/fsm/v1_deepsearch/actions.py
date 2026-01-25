@@ -3,16 +3,14 @@ from typing import Optional
 
 from burr.core import action
 
-from haystack.dataclasses import ChatMessage, ChatRole
+from haystack.dataclasses import ChatMessage
 
-from ...models import JinaReaderSearchResult, PageEvaluation
-from ...nlp import build_openai_generator_pipe, build_struct_generator_pipe
-from ...tools import init_tool_invoker
+from ...models import SearchReasoning
+from ...nlp import build_struct_generator_pipe
+from ...tools import jina_search, jina_result_to_formatted_pages
 
 from .models import ApplicationState
-from .config import CURRENT_TOOLS, web_search_tool
-from .utils import build_page_evaluation_msgs, page_is_good_enough, build_tool_msg_from_evals
-from .prompt import get_iterative_searcher_sys_prompt, get_iterative_searcher_user_prompt_template
+from .prompt import get_iterative_searcher_sys_prompt, get_iterative_searcher_user_prompt_template, get_iterative_web_results_user_prompt_template, get_iterative_web_results_user_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +19,7 @@ logger = logging.getLogger(__name__)
     reads=[],
     writes=[
         "user_query",
+        "next_search_query",
         "msg_history",
     ],
 )
@@ -32,6 +31,7 @@ def init_msg_history(
         query = input("Type your question:\n")
 
     state.user_query = query
+    state.next_search_query = query
 
     sys_message = ChatMessage.from_system(get_iterative_searcher_sys_prompt())
     user_message = ChatMessage.from_user(get_iterative_searcher_user_prompt_template())
@@ -42,172 +42,37 @@ def init_msg_history(
 
 @action.pydantic(
     reads=[
-        "msg_history",
-        "user_query"
-    ],
-    writes=[
-        "msg_history",
-    ],
-)
-def generate_search_params(
-    state: ApplicationState,
-) -> ApplicationState:
-    generator_pipe, input_builder, output_parser = build_openai_generator_pipe()
-    pipe_input = input_builder(
-                    msgs=state.msg_history,
-                    generator_run_kwargs={
-                        "generation_kwargs": {
-                            "tool_choice": {
-                                "type": "function",
-                                "function": {"name": web_search_tool.name}
-                            },
-                            "reasoning_effort": "low",
-                            "parallel_tool_calls": False,
-                        },
-                        "tools": CURRENT_TOOLS,
-                        "tools_strict": True,
-                    },
-                    template_variables={
-                        "user_query": state.user_query,
-                    },
-                )
-    pipe_output = generator_pipe.run(
-        pipe_input,
-    )
-    ass_msg: ChatMessage = output_parser(pipe_output)[0]
-    state.msg_history.append(ass_msg)
-
-    return state
-
-
-@action.pydantic(
-    reads=[
-        "msg_history",
+        "next_search_query",
     ],
     writes=[
         "search_results",
+        "token_counter",
         "search_counter",
+        "msg_history",
     ],
 )
 def invoke_web_search_tool(
     state: ApplicationState,
 ) -> ApplicationState:
-    ass_msg: ChatMessage = state.msg_history[-1]
-    if ass_msg.role != ChatRole.ASSISTANT:
-        raise ValueError("Last message must be an assistant message")
+    logger.info(f"Calling Jina API with query='{state.next_search_query}'")
+    search_result = jina_search(state.next_search_query)
 
-    tool_invoker = init_tool_invoker(
-        CURRENT_TOOLS,
-        tool_invoker_kwargs={
-            "convert_result_to_json_string": True,
-        }
-    )
-    tool_invoker_result = tool_invoker.run(
-        messages=[ass_msg]
-    )
-    tool_messages = tool_invoker_result["tool_messages"]
+    if search_result.success:
+        logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
+    else:
+        logger.warning(f"Failure to call Jina API")
 
-    if not all([msg.tool_call_result for msg in tool_messages]):
-        raise ValueError("Every tool message must have tool call result")
+    logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
 
-    state.search_results.append(
-        [
-            JinaReaderSearchResult.model_validate_json(
-                msg.tool_call_result.result
-            ) for msg in tool_messages
-        ]
-    )
+    state.search_results.append(search_result)
+    state.token_counter += search_result.total_used_tokens
     state.search_counter += 1
-
-    return state
-
-
-@action.pydantic(
-    reads=[
-        "search_results",
-    ],
-    writes=[
-        "search_results",
-    ],
-)
-def evaluate_pages(
-    state: ApplicationState,
-) -> ApplicationState:
-    for result in state.search_results[-1]:
-        for idx, page in enumerate(result.scraped_pages, 1):
-            struct_pipe, input_builder, output_parser = build_struct_generator_pipe()
-            pipe_input = input_builder(
-                msgs=build_page_evaluation_msgs(),
-                struct_model=PageEvaluation,
-                template_variables={
-                    "search_query": result.query,
-                    "page_content": page.content,
-                },
-            )
-            pipe_output = struct_pipe.run(
-                pipe_input,
-            )
-            ass_msg: ChatMessage = output_parser(pipe_output)[0]
-
-            page.llm_eval = PageEvaluation.model_validate_json(ass_msg.text)
-            
-            # Print scores for this page
-            title_short = page.title[:40] + "..." if len(page.title) > 40 else page.title
-            logger.info(f"  [green]Page {idx}:[/green] depth={page.llm_eval.depth_score}/5, rel={page.llm_eval.relevance_score}/5 | {title_short}")
-
-    return state
-
-
-@action.pydantic(
-    reads=[
-        "search_results",
-    ],
-    writes=[
-        "search_results",
-    ],
-)
-def filter_low_quality_pages(
-    state: ApplicationState,
-) -> ApplicationState:
-    # Filter pages in the latest iteration
-    for result in state.search_results[-1]:
-        result.scraped_pages = [
-            page for page in result.scraped_pages
-            if page_is_good_enough(page)
-        ]
-    
-    # Log how many pages remain
-    total_pages = sum(len(r.scraped_pages) for r in state.search_results[-1])
-    logger.info(f"Kept {total_pages} high-quality pages after filtering")
-
-    return state
-
-
-@action.pydantic(
-    reads=[
-        "search_results",
-        "msg_history",
-    ],
-    writes=[
-        "msg_history",
-    ],
-)
-def llm_context_builder(
-    state: ApplicationState,
-) -> ApplicationState:
-    filtered_pages = [
-        page
-        for result in state.search_results[-1]
-        for page in result.scraped_pages
-    ]
-
-    ass_msg: ChatMessage = state.msg_history[-1]
-    if ass_msg.role != ChatRole.ASSISTANT:
-        raise ValueError("Last message must be an assistant message")
-    web_search_tool_call = ass_msg.tool_call
-
-    web_search_tool_msg = build_tool_msg_from_evals(filtered_pages, web_search_tool_call)
-    state.msg_history.append(web_search_tool_msg)
+    # this message will be swapped
+    state.msg_history.append(
+        ChatMessage.from_user(
+            get_iterative_web_results_user_prompt_template()
+        )
+    )
 
     return state
 
@@ -234,7 +99,56 @@ def loop_breaker(
 
 @action.pydantic(
     reads=[
+        "search_results",
+        "msg_history",
+        "user_query",
+    ],
+    writes=[
+        "next_search_query",
+        "msg_history",
+    ],
+)
+def generate_search_params(
+    state: ApplicationState,
+) -> ApplicationState:
+    if not state.search_results:
+        raise ValueError("There must be at least one search result")
+    pages_with_content = jina_result_to_formatted_pages(state.search_results[-1])
+    pages_without_content = jina_result_to_formatted_pages(state.search_results[-1], include_content=False)
+
+    struct_pipe, input_builder, output_parser = build_struct_generator_pipe()
+    pipe_input = input_builder(
+        msgs=state.msg_history,
+        struct_model=SearchReasoning,
+        generator_run_kwargs={
+            "generation_kwargs": {
+                # "reasoning_effort": "low",
+            },
+        },
+        template_variables={
+            "user_query": state.user_query,
+            "search_result": "\n---\n".join(pages_with_content),
+        },
+    )
+    pipe_output = struct_pipe.run(
+        pipe_input,
+    )
+    ass_msg: ChatMessage = output_parser(pipe_output)[0]
+
+    llm_reasoning = SearchReasoning.model_validate_json(ass_msg.text)
+    state.next_search_query = llm_reasoning.next_search_query
+
+    # we remove content from the search results to save tokens
+    state.msg_history[-1] = ChatMessage.from_user(get_iterative_web_results_user_prompt("\n---\n".join(pages_without_content)))
+    state.msg_history.append(ass_msg)
+
+    return state
+
+
+@action.pydantic(
+    reads=[
         "search_counter",
+        "token_counter",
     ],
     writes=[
     ],
@@ -243,5 +157,6 @@ def end(
     state: ApplicationState,
 ) -> ApplicationState:
     logger.info(f"FSM finished after {state.search_counter} iterations")
+    logger.info(f"Total of {state.token_counter} tokens accumulated")
 
     return state

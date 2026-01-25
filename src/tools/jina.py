@@ -1,7 +1,7 @@
 import logging
 import requests
 from urllib.parse import urlencode
-from typing import List, Dict, Annotated, Optional
+from typing import List, Dict, Annotated
 
 import pydantic
 
@@ -13,7 +13,7 @@ from ..models import JinaReaderSearchResult, ScrapedWebPage
 logger = logging.getLogger(__name__)
 
 
-def jina_search(query: str, max_results: int) -> JinaReaderSearchResult:
+def jina_search(query: str, max_results: int = jina_config.NUM_PAGES_PER_SEARCH) -> JinaReaderSearchResult:
     base_url = "https://s.jina.ai/"
     
     # Build query parameters
@@ -66,7 +66,7 @@ def jina_search(query: str, max_results: int) -> JinaReaderSearchResult:
     )
 
 
-def jina_result_to_formatted_strs(search_result: JinaReaderSearchResult) -> List[str]:
+def jina_result_to_formatted_pages(search_result: JinaReaderSearchResult, include_content: bool = True) -> List[str]:
     if not search_result.success:
         return ["Web search failed, try another time"]
     
@@ -76,8 +76,9 @@ def jina_result_to_formatted_strs(search_result: JinaReaderSearchResult) -> List
         page_str = f"[{idx}] Title: {page.title}\n"
         page_str += f"[{idx}] URL Source: {page.url}\n"
         page_str += f"[{idx}] Description: {page.description}\n"
-        page_str += "\n"
-        page_str += page.content
+        if include_content:
+            page_str += "\n"
+            page_str += page.content
         
         formatted_pages.append(page_str)
     
@@ -86,7 +87,7 @@ def jina_result_to_formatted_strs(search_result: JinaReaderSearchResult) -> List
 
 def search_web_formatted_str_out(
     query: Annotated[str, "A query to be searched in the web"],
-) -> List[Optional[str]]:
+) -> List[str]:
     """
     Performs a web search and returns scraped web page texts.
     """
@@ -95,7 +96,7 @@ def search_web_formatted_str_out(
     # SHORT CIRCUIT FOR TESTING
     # return ["Web Search failed due to the rate limits."]
 
-    search_result = jina_search(query, jina_config.NUM_PAGES_PER_SEARCH)
+    search_result = jina_search(query)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
     else:
@@ -103,9 +104,7 @@ def search_web_formatted_str_out(
 
     logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
 
-    formatted_strs = jina_result_to_formatted_strs(search_result)
-
-    return formatted_strs
+    return jina_result_to_formatted_pages(search_result)
 
 
 def search_web_structured_out(
@@ -116,7 +115,7 @@ def search_web_structured_out(
     """
     logger.info(f"Calling Jina API with query='{query}'")
 
-    search_result = jina_search(query, jina_config.NUM_PAGES_PER_SEARCH)
+    search_result = jina_search(query)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
     else:
