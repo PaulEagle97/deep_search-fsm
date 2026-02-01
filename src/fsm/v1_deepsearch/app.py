@@ -1,10 +1,8 @@
-import json
 import logging
 
 from rich.logging import RichHandler
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 from burr.core import Application, ApplicationBuilder, when
 from burr.integrations.pydantic import PydanticTypingSystem
@@ -17,6 +15,7 @@ from .actions import (
     loop_breaker,
     generate_search_params,
     invoke_web_search_tool,
+    filter_search_results,
     end,
 )
 from .config import fsm_config
@@ -35,14 +34,16 @@ def build_burr_app(visualize: bool = False) -> Application:
                 token_limit=fsm_config.SEARCH_CONTEXT_TOKEN_LIMIT,
             ),
             generate_search_params,
+            filter_search_results,
             end,
         )
         .with_transitions(
             ("init_msg_history", "invoke_web_search_tool"),
             ("invoke_web_search_tool", "loop_breaker"),
             ("loop_breaker", "generate_search_params", when(continue_search=True)),
-            ("loop_breaker", "end", when(continue_search=False)),
+            ("loop_breaker", "filter_search_results", when(continue_search=False)),
             ("generate_search_params", "invoke_web_search_tool"),
+            ("filter_search_results", "end"),
         )
         .with_typing(PydanticTypingSystem(ApplicationState))
         .with_state(ApplicationState())
@@ -76,9 +77,12 @@ if __name__ == "__main__":
     )
 
     app = build_burr_app()
-    query = "From 2020 to 2050, how many elderly people will there be in Japan? What is their consumption potential across various aspects such as clothing, food, housing, and transportation? Based on population projections, elderly consumer willingness, and potential changes in their consumption habits, please produce a market size analysis report for the elderly demographic."
-    query = "I am looking for Ausbildung and Studium programs in the UI/UX domain. I live in Rosenheim, Germany. Research what current options are available for me to enroll."
     query = "How to build a house in Germany? Explore the whole process from city approval to buying materials and finding contractors."
+    query = "I am looking for Ausbildung and Studium programs in the UI/UX domain. I live in Rosenheim, Germany. Research what current options are available for me to enroll."
+    query = "How to build a house in Germany? Explain the whole process."
+    query = "What are the investment philosophies of Duan Yongping, Warren Buffett, and Charlie Munger?"
+    query = "From 2020 to 2050, how many elderly people will there be in Japan? What is their consumption potential across various aspects such as clothing, food, housing, and transportation? Based on population projections, elderly consumer willingness, and potential changes in their consumption habits, please produce a market size analysis report for the elderly demographic."
+    query = "Write a research paper about SOTA in Deep Search agentic systems with practical examples."
     final_action, result, state = app.run(
         halt_after=["end"], 
         inputs={"query" : query}
@@ -96,17 +100,15 @@ if __name__ == "__main__":
         }.get(msg.role, "white")
 
         content = msg.text or "[empty]"
-        if msg.role == ChatRole.ASSISTANT:
-            parsed = json.loads(content)
-            formatted_json = json.dumps(parsed, indent=2, ensure_ascii=False)
-            content = Syntax(formatted_json, "json", theme="ansi_light", word_wrap=True)
 
-        console.print(Panel(
-            content,
-            title=f"Message {i} | {msg.role}",
-            title_align="left",
-            border_style=role_style,
-        ))
+        console.print(
+            Panel(
+                content,
+                title=f"Message {i} | {msg.role}",
+                title_align="left",
+                border_style=role_style,
+            )
+        )
 
     # Save search results to markdown
     with open("search_results.md", "w") as f:
@@ -118,7 +120,7 @@ if __name__ == "__main__":
         
         for iteration_idx, search_result in enumerate(typed_state.search_results):
             f.write(f"## Iteration {iteration_idx + 1}: `{search_result.query}`\n\n")
-            f.write(f"**Success:** {search_result.success} | **Tokens:** {search_result.total_used_tokens}\n\n")
+            f.write(f"**Success:** {search_result.success} | **Tokens:** {search_result.total_jina_tokens}\n\n")
             
             for page_idx, page in enumerate(search_result.scraped_pages):
                 f.write(f"### Page {page_idx + 1}: {page.title}\n\n")

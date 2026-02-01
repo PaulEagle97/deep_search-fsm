@@ -1,3 +1,6 @@
+from jinja2 import Template
+
+
 def get_sys_prompt() -> str:
     return """You are an expert research assistant specialized in conducting comprehensive, in-depth research on complex topics.
 
@@ -167,11 +170,7 @@ Break this down into focused search queries and call the web search tool.
 def get_iterative_searcher_sys_prompt() -> str:
     return """You are an assistant that gathers web sources to support a research task.
 
-Based on the last web search results, compose the next search query to increase source coverage on the research topic.
-
-**Instructions:**
-1. **Analyze Web Content**: Evaluate how the search results contribute to the task.
-2. **Define Next Step**: Decide what should be searched for next to diversify already seen web sources.
+Based on the latest web search results, compose the next search query to increase source coverage on the research topic.
 
 Each search query you generate should be:
 1. **Relevant**: Stick to the research goal
@@ -189,17 +188,25 @@ Collect diverse and relevant web sources for this task.
 """
 
 
-def get_iterative_web_results_user_prompt_template() -> str:
-    return """**Web Search Results:**
+ITERATIVE_WEB_RESULTS_TEMPLATE = \
+"""**Web Search Results:**
 {{ search_result }}
 
-Analyze these results and generate next search query.
+**Previously Executed Queries:**
+{%- for q in executed_queries %}
+- {{ q }}
+{%- endfor %}
+
+Analyze the results and generate a new search query that is semantically different from all of the above.
 """
 
 
-def get_iterative_web_results_user_prompt(search_result: str) -> str:
-    return f"""**Web Search Results:**
-{search_result}
+def get_iterative_web_results_user_prompt_template() -> str:
+    """Return raw template for Haystack's ChatPromptBuilder."""
+    return ITERATIVE_WEB_RESULTS_TEMPLATE
 
-Analyze these results and generate next search query.
-"""
+
+def get_iterative_web_results_user_prompt(search_result: str, executed_queries: list[str]) -> str:
+    """Render template with actual values (for message swapping)."""
+    template = Template(ITERATIVE_WEB_RESULTS_TEMPLATE)
+    return template.render(search_result=search_result, executed_queries=executed_queries)

@@ -6,6 +6,7 @@ from typing import List
 from haystack.dataclasses import ChatMessage, ToolCall
 
 from src.models.jina import ScrapedWebPage
+from src.models.llm import SearchReasoning
 
 from ...models import JinaReaderSearchResult
 from ...tools import jina_search
@@ -49,7 +50,7 @@ def get_cached_or_fetch(query: str, num_pages: int) -> JinaReaderSearchResult:
         logger.info(f"Cache MISS for query: '{query[:50]}...' - fetching from Jina API")
         search_result = jina_search(query, num_pages)
         
-        logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
+        logger.info(f"Number of burned Jina API tokens: {search_result.total_jina_tokens}")
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
 
         # Save to cache (using model_dump with mode='json' for JSON-serializable output)
@@ -126,3 +127,7 @@ def build_tool_msg_from_evals(pages: List[ScrapedWebPage], tool_call: ToolCall) 
         tool_result=formatted,
         origin=tool_call,
     )
+
+
+def format_llm_reasoning(llm_reasoning: SearchReasoning) -> str:
+    return f"**Evaluation:** {llm_reasoning.search_result_evaluation}\n**Next Query:** {llm_reasoning.next_search_query}"

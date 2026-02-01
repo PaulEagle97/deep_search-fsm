@@ -12,4 +12,5 @@ class ApplicationState(BaseModel):
     token_counter: int = 0
     msg_history: List[ChatMessage] = []
     search_results: List[JinaReaderSearchResult] = []
+    executed_queries: List[str] = []
     continue_search: bool = True

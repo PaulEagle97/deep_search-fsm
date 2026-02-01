@@ -8,6 +8,7 @@ import pydantic
 from rich.logging import RichHandler
 
 from ..core import jina_config
+from ..nlp import count_tokens
 from ..models import JinaReaderSearchResult, ScrapedWebPage
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,8 @@ def jina_search(query: str, max_results: int = jina_config.NUM_PAGES_PER_SEARCH)
                 title=page["title"],
                 description=page["description"],
                 content=page["content"],
-                used_tokens=page["usage"]["tokens"],
+                jina_tokens=page["usage"]["tokens"],
+                openai_tokens=count_tokens(page["content"]),
             ) for page in search_results["data"]
         ]
 
@@ -51,7 +53,7 @@ def jina_search(query: str, max_results: int = jina_config.NUM_PAGES_PER_SEARCH)
             query=query,
             success=True,
             scraped_pages=pages,
-            total_used_tokens=search_results["meta"]["usage"]["tokens"]
+            total_jina_tokens=search_results["meta"]["usage"]["tokens"],
         )
 
     except requests.exceptions.RequestException:
@@ -99,10 +101,9 @@ def search_web_formatted_str_out(
     search_result = jina_search(query)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
+        logger.info(f"Number of burned Jina API tokens: {search_result.total_jina_tokens}")
     else:
         logger.warning(f"Failure to call Jina API")
-
-    logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
 
     return jina_result_to_formatted_pages(search_result)
 
@@ -118,14 +119,11 @@ def search_web_structured_out(
     search_result = jina_search(query)
     if search_result.success:
         logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
+        logger.info(f"Number of burned Jina API tokens: {search_result.total_jina_tokens}")
     else:
         logger.warning(f"Failure to call Jina API")
 
-    logger.info(f"Number of burned Jina API tokens: {search_result.total_used_tokens}")
-
     return search_result.model_dump(mode='json')
-
-
 
 
 if __name__ == "__main__":

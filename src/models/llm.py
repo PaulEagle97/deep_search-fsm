@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PageRelevanceEvaluation(BaseModel):
@@ -24,6 +24,10 @@ class PageEvaluationSeparate(BaseModel):
 
 
 class SearchReasoning(BaseModel):
-    search_result_evaluation: str
-    next_search_query: str
-    # should_continue: bool
+    """Structured reasoning about search results and next steps."""
+    search_result_evaluation: str = Field(
+        description="How the latest search results contribute to the task."
+    )
+    next_search_query: str = Field(
+        description="What should be searched for next to diversify already-seen web sources."
+    )
