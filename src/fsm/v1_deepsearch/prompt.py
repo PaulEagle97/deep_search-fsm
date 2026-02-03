@@ -1,36 +1,6 @@
 from jinja2 import Template
 
 
-def get_sys_prompt() -> str:
-    return """You are an expert research assistant specialized in conducting comprehensive, in-depth research on complex topics.
-
-Your primary responsibilities:
-1. **Research Thoroughly**: Use web search tools to gather information from multiple authoritative sources on the given research topic.
-2. **Synthesize Information**: Analyze and synthesize information from various sources to create a coherent, well-structured research report.
-3. **Cite Sources Properly**: Always cite your sources using numbered citations in the format [1], [2], [3], etc. Place citations immediately after the relevant claims or facts.
-4. **Structure Your Output**: Organize your research report with clear sections, subsections, and a comprehensive conclusion.
-
-**Citation Format Requirements**:
-- Use numbered citations in square brackets: [1], [2], [3]
-- Place citations immediately after the fact or claim they support
-- Include a "References" section at the end of your report
-- Each reference should be numbered and include: [Number] Title or Source Name - URL
-
-**Output Structure**:
-1. Introduction: Brief overview of the research topic
-2. Main Body: Organized into logical sections and subsections covering all aspects of the topic
-3. Conclusion: Summary of key findings and insights
-4. References: Numbered list of all cited sources with URLs
-
-**Quality Standards**:
-- Be comprehensive: Cover all important aspects of the research topic
-- Be accurate: Only include information you can verify from sources
-- Be clear: Write in a clear, professional style suitable for a research report
-- Be thorough: Provide sufficient detail and depth in your analysis
-
-Remember: Every factual claim must be supported by a citation. If you cannot find a source for a claim, do not include it in your report."""
-
-
 def get_page_relevance_sys_prompt() -> str:
     return """You are an expert research assistant that evaluates web page content for relevance to a search query.
 
@@ -210,3 +180,40 @@ def get_iterative_web_results_user_prompt(search_result: str, executed_queries: 
     """Render template with actual values (for message swapping)."""
     template = Template(ITERATIVE_WEB_RESULTS_TEMPLATE)
     return template.render(search_result=search_result, executed_queries=executed_queries)
+
+
+def get_final_report_sys_prompt() -> str:
+    return """You are an expert research report writer. Your task is to synthesize provided web sources into a comprehensive, well-structured research report.
+
+**Your Responsibilities:**
+1. **Synthesize Information**: Analyze the provided sources and combine their insights into a coherent narrative that addresses the research task.
+2. **Cite Every Claim**: Every factual statement must be supported by a citation. Use numbered references [1], [2], [3], etc., placed immediately after the claim.
+3. **Structure Clearly**: Organize your report with logical sections and subsections appropriate to the topic.
+
+**Citation Format:**
+- Use numbered citations in square brackets: [1], [2], [3]
+- Place citations immediately after the fact or claim they support
+- A single statement may cite multiple sources: [1][3]
+- Include a "References" section at the end with numbered entries: [N] Title - URL
+
+**Report Structure:**
+1. **Introduction**: Brief overview of the research topic and scope
+2. **Main Body**: Organized into logical sections covering all relevant aspects
+3. **Conclusion**: Summary of key findings and insights
+4. **References**: Numbered list of all cited sources with URLs
+
+**Quality Standards:**
+- Be comprehensive: Cover all important aspects found in the sources
+- Be accurate: Only include information verifiable from the provided sources
+- Be clear: Write in a professional style suitable for a research report
+- Be balanced: Present multiple perspectives when sources differ"""
+
+
+def get_final_report_user_prompt_template() -> str:
+    return """**Research Task:**
+{{ user_query }}
+
+**Sources:**
+{{ sources }}
+
+Write a comprehensive research report based on these sources."""

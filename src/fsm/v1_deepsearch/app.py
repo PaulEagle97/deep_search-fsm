@@ -15,7 +15,8 @@ from .actions import (
     loop_breaker,
     generate_search_params,
     invoke_web_search_tool,
-    filter_search_results,
+    prepare_report_sources,
+    generate_report,
     end,
 )
 from .config import fsm_config
@@ -34,16 +35,20 @@ def build_burr_app(visualize: bool = False) -> Application:
                 token_limit=fsm_config.SEARCH_CONTEXT_TOKEN_LIMIT,
             ),
             generate_search_params,
-            filter_search_results,
+            prepare_report_sources.bind(
+                token_limit=fsm_config.SEARCH_CONTEXT_TOKEN_LIMIT,
+            ),
+            generate_report,
             end,
         )
         .with_transitions(
             ("init_msg_history", "invoke_web_search_tool"),
             ("invoke_web_search_tool", "loop_breaker"),
             ("loop_breaker", "generate_search_params", when(continue_search=True)),
-            ("loop_breaker", "filter_search_results", when(continue_search=False)),
+            ("loop_breaker", "prepare_report_sources", when(continue_search=False)),
             ("generate_search_params", "invoke_web_search_tool"),
-            ("filter_search_results", "end"),
+            ("prepare_report_sources", "generate_report"),
+            ("generate_report", "end"),
         )
         .with_typing(PydanticTypingSystem(ApplicationState))
         .with_state(ApplicationState())
@@ -110,23 +115,38 @@ if __name__ == "__main__":
             )
         )
 
-    # Save search results to markdown
-    with open("search_results.md", "w") as f:
-        f.write("# Iterative Search Results\n\n")
-        f.write(f"**User Query:** {typed_state.user_query}\n\n")
-        f.write(f"**Total Iterations:** {typed_state.search_counter}\n\n")
-        f.write(f"**Total Tokens:** {typed_state.token_counter}\n\n")
+    # Save research report to markdown
+    with open("research_report.md", "w") as f:
+        # Header
+        f.write("# Research Report\n\n")
+        
+        # Research Task
+        f.write("## Research Task\n\n")
+        f.write(f"{typed_state.user_query}\n\n")
         f.write("---\n\n")
         
-        for iteration_idx, search_result in enumerate(typed_state.search_results):
-            f.write(f"## Iteration {iteration_idx + 1}: `{search_result.query}`\n\n")
-            f.write(f"**Success:** {search_result.success} | **Tokens:** {search_result.total_jina_tokens}\n\n")
-            
-            for page_idx, page in enumerate(search_result.scraped_pages):
-                f.write(f"### Page {page_idx + 1}: {page.title}\n\n")
-                f.write(f"**URL:** {page.url}\n\n")
-                f.write(f"**Description:** {page.description}\n\n")
-                f.write(f"**Content:**\n\n```\n{page.content[:2000]}{'...' if len(page.content) > 2000 else ''}\n```\n\n")
-                f.write("---\n\n")
+        # Final Report
+        f.write("## Report\n\n")
+        f.write(f"{typed_state.final_report}\n\n")
+        f.write("---\n\n")
+        
+        # Search Queries
+        f.write("## Search Queries\n\n")
+        f.write(f"*{len(typed_state.executed_queries)} queries executed across {typed_state.search_counter} iterations*\n\n")
+        for idx, query in enumerate(typed_state.executed_queries, 1):
+            f.write(f"{idx}. `{query}`\n")
+        f.write("\n---\n\n")
+        
+        # Report Sources
+        f.write("## Sources\n\n")
+        f.write(f"*{len(typed_state.report_sources)} sources used for report generation*\n\n")
+        for idx, page in enumerate(typed_state.report_sources, 1):
+            f.write(f"### [{idx}] {page.title}\n\n")
+            f.write(f"**URL:** {page.url}\n\n")
+            f.write(f"**Description:** {page.description}\n\n")
+            content_preview = page.content[:3000]
+            if len(page.content) > 3000:
+                content_preview += "..."
+            f.write(f"<details>\n<summary>Content preview ({page.content_tokens} tokens)</summary>\n\n```\n{content_preview}\n```\n\n</details>\n\n")
     
-    logger.info(f"Search results saved to search_results.md")
+    logger.info("Research report saved to research_report.md")

@@ -8,7 +8,6 @@ import pydantic
 from rich.logging import RichHandler
 
 from ..core import jina_config
-from ..nlp import count_tokens
 from ..models import JinaReaderSearchResult, ScrapedWebPage
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,6 @@ def jina_search(query: str, max_results: int = jina_config.NUM_PAGES_PER_SEARCH)
                 description=page["description"],
                 content=page["content"],
                 jina_tokens=page["usage"]["tokens"],
-                openai_tokens=count_tokens(page["content"]),
             ) for page in search_results["data"]
         ]
 

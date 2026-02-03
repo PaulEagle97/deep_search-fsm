@@ -7,8 +7,9 @@ from haystack.dataclasses import ChatMessage
 from haystack.utils import Secret
 from haystack.components.builders import ChatPromptBuilder
 from haystack.components.generators.chat import AzureOpenAIChatGenerator
+from haystack_integrations.components.generators.google_genai import GoogleGenAIChatGenerator
 
-from ..core import azure_config
+from ..core import azure_config, gemini_config
 
 
 def build_openai_generator_pipe() -> Tuple[Pipeline, Callable, Callable]:
@@ -91,6 +92,37 @@ def build_struct_generator_pipe() -> Tuple[Pipeline, Callable, Callable]:
                     "response_format": json_schema
                 }
             },
+        }
+
+    def output(response: Dict[str, Any]) -> List[ChatMessage]:
+        return response["llm"]["replies"]
+
+    return pipe, input, output
+
+
+def build_gemini_generator_pipe() -> Tuple[Pipeline, Callable, Callable]:
+    prompt_builder = ChatPromptBuilder()
+    llm = GoogleGenAIChatGenerator(
+        api_key=Secret.from_token(gemini_config.API_KEY),
+        model=gemini_config.MODELS[0],
+    )
+
+    pipe = Pipeline()
+    pipe.add_component("prompt_builder", prompt_builder)
+    pipe.add_component("llm", llm)
+    pipe.connect("prompt_builder.prompt", "llm.messages")
+
+    def input(
+        msgs: List[ChatMessage],
+        generator_run_kwargs: Dict[str, Any] = {},
+        template_variables: Dict[str, Any] | None = None,
+    ) -> Dict:
+        return {
+            "prompt_builder": {
+                "template": msgs,
+                **({"template_variables": template_variables} if template_variables else {}),
+            },
+            "llm": {**generator_run_kwargs},
         }
 
     def output(response: Dict[str, Any]) -> List[ChatMessage]:

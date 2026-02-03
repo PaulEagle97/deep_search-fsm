@@ -1,9 +1,9 @@
 import json
 import logging
 from pathlib import Path
-from typing import List
+from typing import Callable, List
 
-from haystack.dataclasses import ChatMessage, ToolCall
+from haystack.dataclasses import ChatMessage
 
 from src.models.jina import ScrapedWebPage
 from src.models.llm import SearchReasoning
@@ -18,6 +18,10 @@ from .prompt import (
     get_page_eval_user_prompt_template,
     get_page_relevance_user_prompt_template,
     get_page_depth_user_prompt_template,
+    get_iterative_searcher_sys_prompt,
+    get_final_report_sys_prompt,
+    get_final_report_user_prompt_template,
+    get_iterative_searcher_user_prompt_template,
 )
 logger = logging.getLogger(__name__)
 
@@ -81,53 +85,43 @@ def build_page_evaluation_msgs() -> List[ChatMessage]:
     return [sys_message, user_message]
 
 
-def page_is_good_enough(page: ScrapedWebPage):
-    return page.llm_eval.depth_score > 2 and page.llm_eval.relevance_score > 2
+def build_iterative_searcher_msgs() -> List[ChatMessage]:
+    sys_message = ChatMessage.from_system(get_iterative_searcher_sys_prompt())
+    user_message = ChatMessage.from_user(get_iterative_searcher_user_prompt_template())
+
+    return [sys_message, user_message]
 
 
-def format_evaluated_pages_for_llm(pages: List[ScrapedWebPage]) -> str:
-    """
-    Convert a list of evaluated web pages to a formatted string for LLM consumption.
-    Shows page metadata, evaluation scores, and summaries.
-    """
+def format_pages_for_report(pages: List[ScrapedWebPage]) -> str:
     if not pages:
-        return "No pages were found or evaluated."
+        return "No sources available."
     
-    sections = []
-    for idx, page in enumerate(pages, 1):
-        section = f"[{idx}] {page.title}\n"
-        section += f"    URL: {page.url}\n"
-        
-        if page.llm_eval:
-            eval = page.llm_eval
-            section += f"    Relevance: {eval.relevance_score}/5 - {eval.relevance_summary}\n"
-            section += f"    Depth: {eval.depth_score}/5 - {eval.depth_summary}\n"
-        else:
-            section += "    (not evaluated)\n"
-        
-        sections.append(section)
+    formatted = []
+    for idx, page in enumerate(pages, start=1):
+        page_str = f"[{idx}] Title: {page.title}\n"
+        page_str += f"[{idx}] URL: {page.url}\n"
+        page_str += f"\n{page.content}"
+        formatted.append(page_str)
     
-    # Add summary stats
-    evaluated = [p for p in pages if p.llm_eval]
-    if evaluated:
-        avg_rel = sum(p.llm_eval.relevance_score for p in evaluated) / len(evaluated)
-        avg_depth = sum(p.llm_eval.depth_score for p in evaluated) / len(evaluated)
-        header = f"Found {len(pages)} pages (avg relevance: {avg_rel:.1f}/5, avg depth: {avg_depth:.1f}/5)\n\n"
-    else:
-        header = f"Found {len(pages)} pages\n\n"
-    
-    return header + "\n".join(sections)
+    return "\n---\n".join(formatted)
 
 
-def build_tool_msg_from_evals(pages: List[ScrapedWebPage], tool_call: ToolCall) -> ChatMessage:
-    """Build a tool result message from evaluated pages."""
-    formatted = format_evaluated_pages_for_llm(pages)
-    
-    return ChatMessage.from_tool(
-        tool_result=formatted,
-        origin=tool_call,
-    )
+def build_report_generator_msgs() -> List[ChatMessage]:
+    sys_message = ChatMessage.from_system(get_final_report_sys_prompt())
+    user_message = ChatMessage.from_user(get_final_report_user_prompt_template())
+
+    return [sys_message, user_message]
 
 
 def format_llm_reasoning(llm_reasoning: SearchReasoning) -> str:
     return f"**Evaluation:** {llm_reasoning.search_result_evaluation}\n**Next Query:** {llm_reasoning.next_search_query}"
+
+
+def count_content_tokens(search_result: JinaReaderSearchResult, tokenizer: Callable[[str], int]):
+    total = 0
+    for page in search_result.scraped_pages:
+        content_tokens = tokenizer(page.content)
+        page.content_tokens = content_tokens
+        total += content_tokens
+    
+    return total, search_result

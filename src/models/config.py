@@ -34,6 +34,16 @@ class JinaEnvs(BaseSettings):
     )
 
 
+class GeminiSettings(BaseSettings):
+    API_KEY: str
+    MODELS: list[str]
+
+    model_config = SettingsConfigDict(
+        env_prefix="GEMINI_",
+        env_file="google.env",
+    )
+
+
 class JinaConfig(BaseModel):
     envs: JinaEnvs = Field(default_factory=JinaEnvs)
     NUM_PAGES_PER_SEARCH: int
