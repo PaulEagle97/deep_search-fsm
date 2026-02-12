@@ -29,14 +29,16 @@ def build_burr_app(visualize: bool = False) -> Application:
         ApplicationBuilder()
         .with_actions(
             init_msg_history,
-            invoke_web_search_tool,
+            invoke_web_search_tool.bind(
+                search_token_limit=fsm_config.SEARCH_TOKEN_LIMIT,
+            ),
             loop_breaker.bind(
-                max_iterations=fsm_config.LLM_ITERATIONS_THRESHOLD,
-                token_limit=fsm_config.SEARCH_CONTEXT_TOKEN_LIMIT,
+                max_searches=fsm_config.MAX_NUMBER_SEARCHES,
+                sources_token_limit=fsm_config.SOURCES_TOKEN_LIMIT,
             ),
             generate_search_params,
             prepare_report_sources.bind(
-                token_limit=fsm_config.SEARCH_CONTEXT_TOKEN_LIMIT,
+                sources_token_limit=fsm_config.SOURCES_TOKEN_LIMIT,
             ),
             generate_report,
             end,

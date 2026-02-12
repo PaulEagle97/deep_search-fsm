@@ -13,6 +13,6 @@ class ApplicationState(BaseModel):
     msg_history: List[ChatMessage] = []
     search_results: List[JinaReaderSearchResult] = []
     report_sources: List[ScrapedWebPage] = []
-    token_counter: int = 0
+    sources_token_counter: int = 0
     search_counter: int = 0
     continue_search: bool = True

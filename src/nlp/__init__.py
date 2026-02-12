@@ -1,2 +1,2 @@
-from .pipes import build_openai_generator_pipe, build_struct_generator_pipe, build_gemini_generator_pipe
+from .pipes import build_openai_chat_pipe, build_azure_openai_chat_pipe, build_azure_openai_struct_pipe, build_gemini_chat_pipe, build_gemini_struct_pipe
 from .tokenizer import count_openai_tokens, count_gemini_tokens

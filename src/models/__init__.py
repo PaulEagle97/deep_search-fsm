@@ -1,3 +1,3 @@
 from .config import OpenAISettings, AzureOpenAISettings, JinaConfig, GeminiSettings
 from .jina import ScrapedWebPage, JinaReaderSearchResult
-from .llm import PageEvaluation, PageEvaluationSeparate, PageRelevanceEvaluation, PageDepthEvaluation, SearchReasoning
+from .llm import PageEvaluation, PageEvaluationSeparate, PageRelevanceEvaluation, PageDepthEvaluation, SearchReasoningNextQuery, SearchReasoningFollowUps

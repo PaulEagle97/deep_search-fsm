@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class OpenAISettings(BaseSettings):
     API_KEY: str
+    MODELS: list[str]
 
     model_config = SettingsConfigDict(
         env_prefix="OPENAI_",
@@ -15,7 +16,7 @@ class OpenAISettings(BaseSettings):
 
 
 class AzureOpenAISettings(BaseSettings):
-    DEPLOYMENT_NAME: str
+    DEPLOYMENT_NAMES: list[str]
     OPENAI_API_KEY: str
     OPENAI_ENDPOINT: str
 

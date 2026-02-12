@@ -5,12 +5,12 @@ from burr.core import action
 
 from haystack.dataclasses import ChatMessage
 
-from ...models import SearchReasoning
-from ...nlp import build_struct_generator_pipe, build_gemini_generator_pipe, count_gemini_tokens
+from ...models import SearchReasoningNextQuery
+from ...nlp import build_azure_openai_struct_pipe, build_gemini_chat_pipe, count_gemini_tokens
 from ...tools import jina_search, jina_result_to_formatted_pages
 
 from .models import ApplicationState
-from .utils import format_llm_reasoning, format_pages_for_report, build_iterative_searcher_msgs, build_report_generator_msgs, count_content_tokens
+from .utils import format_llm_reasoning_next_query, format_pages_for_report, build_iterative_searcher_msgs, build_report_generator_msgs, count_content_tokens, trim_content_tokens
 from .prompt import get_iterative_web_results_user_prompt_template, get_iterative_web_results_user_prompt
 
 logger = logging.getLogger(__name__)
@@ -45,30 +45,30 @@ def init_msg_history(
     writes=[
         "executed_queries",
         "search_results",
-        "token_counter",
+        "sources_token_counter",
         "search_counter",
     ],
 )
 def invoke_web_search_tool(
     state: ApplicationState,
+    search_token_limit: int,
 ) -> ApplicationState:
     logger.info(f"Calling Jina API with query='{state.next_search_query}'")
     search_result = jina_search(state.next_search_query)
 
-    if search_result.success:
-        logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
-        logger.info(f"Number of burned Jina API tokens: {search_result.total_jina_tokens}")
+    logger.info(f"Burned Jina API tokens: {search_result.total_jina_tokens}")
+    logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
 
-        total_content_tokens, search_result = count_content_tokens(search_result, count_gemini_tokens)
-        logger.info(f"Combined page content tokens: {total_content_tokens}")
+    total_tokens, search_result = count_content_tokens(search_result, count_gemini_tokens)
+    logger.info(f"Counted {total_tokens} page content tokens ({search_token_limit} allowed)")
 
-        state.executed_queries.append(state.next_search_query)
-    else:
-        logger.warning(f"Failure to call Jina API")
+    trimmed_tokens, search_result = trim_content_tokens(search_result, count_gemini_tokens, search_token_limit)
+    logger.info(f"{trimmed_tokens} tokens left after trimming ({len(search_result.scraped_pages)} pages)")
 
-    state.search_counter += 1
-    state.token_counter += total_content_tokens
     state.search_results.append(search_result)
+    state.executed_queries.append(state.next_search_query)
+    state.sources_token_counter += trimmed_tokens
+    state.search_counter += 1
 
     return state
 
@@ -76,7 +76,7 @@ def invoke_web_search_tool(
 @action.pydantic(
     reads=[
         "search_counter",
-        "token_counter",
+        "sources_token_counter",
     ],
     writes=[
         "continue_search",
@@ -84,10 +84,12 @@ def invoke_web_search_tool(
 )
 def loop_breaker(
     state: ApplicationState,
-    max_iterations: int,
-    token_limit: int,
+    max_searches: int,
+    sources_token_limit: int,
 ) -> ApplicationState:
-    if state.search_counter >= max_iterations or state.token_counter >= token_limit:
+    logger.info(f"Finished search N.{state.search_counter}, {state.sources_token_counter} source tokens accumulated so far")
+
+    if state.search_counter >= max_searches or state.sources_token_counter >= sources_token_limit:
         state.continue_search = False
     
     return state
@@ -120,10 +122,10 @@ def generate_search_params(
         )
     )
 
-    struct_pipe, input_builder, output_parser = build_struct_generator_pipe()
+    struct_pipe, input_builder, output_parser = build_azure_openai_struct_pipe()
     pipe_input = input_builder(
         msgs=state.msg_history,
-        struct_model=SearchReasoning,
+        struct_model=SearchReasoningNextQuery,
         generator_run_kwargs={
             "generation_kwargs": {
                 # "reasoning_effort": "low",
@@ -139,12 +141,12 @@ def generate_search_params(
         pipe_input,
     )
     ass_msg: ChatMessage = output_parser(pipe_output)[0]
-    llm_reasoning = SearchReasoning.model_validate_json(ass_msg.text)
+    llm_reasoning = SearchReasoningNextQuery.model_validate_json(ass_msg.text)
 
     # remove content from search results to save tokens
     state.msg_history[-1] = ChatMessage.from_user(get_iterative_web_results_user_prompt("\n---\n".join(pages_without_content), state.executed_queries))
     # format JSON to LLM-friendly text and append as assistant message
-    formatted_ass_msg = format_llm_reasoning(llm_reasoning)
+    formatted_ass_msg = format_llm_reasoning_next_query(llm_reasoning)
     state.msg_history.append(ChatMessage.from_assistant(formatted_ass_msg))
     # extract next search query
     state.next_search_query = llm_reasoning.next_search_query
@@ -162,7 +164,7 @@ def generate_search_params(
 )
 def prepare_report_sources(
     state: ApplicationState,
-    token_limit: int,
+    sources_token_limit: int,
 ) -> ApplicationState:
     selected = []
     discarded = {"too_short": [], "duplicates": []}
@@ -183,13 +185,14 @@ def prepare_report_sources(
     logger.info(f"Discarded {len(discarded['too_short'])} short pages and {len(discarded['duplicates'])} duplicates")
 
     if token_count > 0:
-        token_overflow_ratio = max(0, (token_count - token_limit) / token_count)
+        token_overflow_ratio = max(0, (token_count - sources_token_limit) / token_count)
     else:
         token_overflow_ratio = 0
     logger.info(f"Every selected page's content will be trimmed by {token_overflow_ratio*100:.0f}%")
     for page in selected:
         slice_idx = int(len(page.content)*(1-token_overflow_ratio))
         page.content = page.content[:slice_idx]
+        page.content_tokens = count_gemini_tokens(page.content)
 
     token_count = sum(page.content_tokens for page in selected)
     logger.info(f"Total number of content tokens after trimming: {token_count}")
@@ -211,7 +214,7 @@ def prepare_report_sources(
 def generate_report(
     state: ApplicationState,
 ) -> ApplicationState:
-    generator_pipe, input_builder, output_parser = build_gemini_generator_pipe()
+    generator_pipe, input_builder, output_parser = build_gemini_chat_pipe()
     pipe_input = input_builder(
         msgs=build_report_generator_msgs(),
         template_variables={

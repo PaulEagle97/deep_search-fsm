@@ -5,10 +5,7 @@ from typing import Callable, List
 
 from haystack.dataclasses import ChatMessage
 
-from src.models.jina import ScrapedWebPage
-from src.models.llm import SearchReasoning
-
-from ...models import JinaReaderSearchResult
+from ...models import JinaReaderSearchResult, ScrapedWebPage, SearchReasoningNextQuery, SearchReasoningFollowUps
 from ...tools import jina_search
 
 from .prompt import (
@@ -18,7 +15,7 @@ from .prompt import (
     get_page_eval_user_prompt_template,
     get_page_relevance_user_prompt_template,
     get_page_depth_user_prompt_template,
-    get_iterative_searcher_sys_prompt,
+    get_iterative_searcher_next_query_sys_prompt,
     get_final_report_sys_prompt,
     get_final_report_user_prompt_template,
     get_iterative_searcher_user_prompt_template,
@@ -86,7 +83,7 @@ def build_page_evaluation_msgs() -> List[ChatMessage]:
 
 
 def build_iterative_searcher_msgs() -> List[ChatMessage]:
-    sys_message = ChatMessage.from_system(get_iterative_searcher_sys_prompt())
+    sys_message = ChatMessage.from_system(get_iterative_searcher_next_query_sys_prompt())
     user_message = ChatMessage.from_user(get_iterative_searcher_user_prompt_template())
 
     return [sys_message, user_message]
@@ -113,8 +110,16 @@ def build_report_generator_msgs() -> List[ChatMessage]:
     return [sys_message, user_message]
 
 
-def format_llm_reasoning(llm_reasoning: SearchReasoning) -> str:
-    return f"**Evaluation:** {llm_reasoning.search_result_evaluation}\n**Next Query:** {llm_reasoning.next_search_query}"
+def format_llm_reasoning_next_query(llm_reasoning: SearchReasoningNextQuery) -> str:
+    return f"""**Evaluation:** {llm_reasoning.search_result_evaluation}
+**Next Query:** {llm_reasoning.next_search_query}"""
+
+
+def format_llm_reasoning_follow_ups(llm_reasoning: SearchReasoningFollowUps) -> str:
+    follow_ups_formatted = "\n".join(f"- {direction}" for direction in llm_reasoning.search_result_follow_ups)
+    return f"""**Evaluation:** {llm_reasoning.search_result_evaluation}
+**Follow-up Directions:**
+{follow_ups_formatted}"""
 
 
 def count_content_tokens(search_result: JinaReaderSearchResult, tokenizer: Callable[[str], int]):
@@ -124,4 +129,25 @@ def count_content_tokens(search_result: JinaReaderSearchResult, tokenizer: Calla
         page.content_tokens = content_tokens
         total += content_tokens
     
+    return total, search_result
+
+
+def trim_content_tokens(search_result: JinaReaderSearchResult, tokenizer: Callable[[str], int], token_limit: int):
+    total = 0
+    pages = []
+    for page in search_result.scraped_pages:
+        tokens_available = token_limit - total
+        if page.content_tokens > tokens_available:
+            to_keep_ratio = tokens_available / page.content_tokens
+            page.content = page.content[:int(len(page.content) * to_keep_ratio)]
+            page.content_tokens = tokenizer(page.content)
+            pages.append(page)
+            total += page.content_tokens
+            break
+        else:
+            pages.append(page)
+            total += page.content_tokens
+
+    search_result.scraped_pages = pages
+
     return total, search_result

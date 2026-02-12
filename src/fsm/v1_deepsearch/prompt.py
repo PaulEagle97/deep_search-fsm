@@ -137,16 +137,29 @@ Break this down into focused search queries and call the web search tool.
 """
 
 
-def get_iterative_searcher_sys_prompt() -> str:
+def get_iterative_searcher_next_query_sys_prompt() -> str:
     return """You are an assistant that gathers web sources to support a research task.
 
 Based on the latest web search results, compose the next search query to increase source coverage on the research topic.
 
 Each search query you generate should be:
 1. **Relevant**: Stick to the research goal
-2. **Atomic**: Target ONE specific aspect or sub-question
+2. **Atomic**: Target one specific aspect or sub-question with concise phrasing
 3. **Specific**: Use domain-specific terminology when appropriate
-4. **Complementary**: Avoid overlapping with previously generated search queries
+4. **Novel**: Avoid overlapping with previously generated search queries
+"""
+
+
+def get_iterative_searcher_follow_ups_sys_prompt() -> str:
+    return """You are an assistant that gathers web sources to support a research task.
+
+Based on the latest search results, identify 1-3 promising directions for the next search to increase source coverage on the research topic.
+
+Each search direction you generate should be:
+- **Relevant**: Sticks to the research goal
+- **Atomic**: Targets one specific aspect or sub-question with concise phrasing
+- **Specific**: Uses domain-specific terminology when appropriate
+- **Novel**: Does not overlap with already generated directions
 """
 
 

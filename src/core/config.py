@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from ..models import AzureOpenAISettings, JinaConfig, GeminiSettings
+from ..models import OpenAISettings, AzureOpenAISettings, JinaConfig, GeminiSettings
 
+openai_config = OpenAISettings()
 azure_config = AzureOpenAISettings()
 gemini_config = GeminiSettings()
 

@@ -5,7 +5,7 @@ from burr.core import action
 
 from haystack.dataclasses import ChatMessage, ChatRole, StreamingCallbackT
 
-from ...nlp import build_openai_generator_pipe
+from ...nlp import build_azure_openai_chat_pipe
 from ...tools import init_tool_invoker
 from .models import ApplicationState
 from .config import CURRENT_TOOLS
@@ -49,7 +49,7 @@ def ai_response(
     max_iterations: int,
     streaming_callback: Optional[StreamingCallbackT] = None,
 ) -> ApplicationState:
-    generator_pipe, input_builder, output_parser = build_openai_generator_pipe()
+    generator_pipe, input_builder, output_parser = build_azure_openai_chat_pipe()
     pipe_input = input_builder(
                     msgs=state.chat_history,
                     generator_run_kwargs={
