@@ -10,6 +10,7 @@ from ...nlp import build_azure_openai_struct_pipe, build_gemini_chat_pipe, count
 from ...tools import jina_search, jina_result_to_formatted_pages
 
 from .models import ApplicationState
+from .config import fsm_config
 from .utils import format_llm_reasoning_next_query, format_pages_for_report, build_iterative_searcher_msgs, build_report_generator_msgs, count_content_tokens, trim_content_tokens
 from .prompt import get_iterative_web_results_user_prompt_template, get_iterative_web_results_user_prompt
 
@@ -59,10 +60,11 @@ def invoke_web_search_tool(
     logger.info(f"Burned Jina API tokens: {search_result.total_jina_tokens}")
     logger.info(f"Jina API returned {len(search_result.scraped_pages)} pages")
 
-    total_tokens, search_result = count_content_tokens(search_result, count_gemini_tokens)
+    tokenizer = lambda t: count_gemini_tokens(t, fsm_config.GEMINI_MODEL)
+    total_tokens, search_result = count_content_tokens(search_result, tokenizer)
     logger.info(f"Counted {total_tokens} page content tokens ({search_token_limit} allowed)")
 
-    trimmed_tokens, search_result = trim_content_tokens(search_result, count_gemini_tokens, search_token_limit)
+    trimmed_tokens, search_result = trim_content_tokens(search_result, tokenizer, search_token_limit)
     logger.info(f"{trimmed_tokens} tokens left after trimming ({len(search_result.scraped_pages)} pages)")
 
     state.search_results.append(search_result)
@@ -122,7 +124,7 @@ def generate_search_params(
         )
     )
 
-    struct_pipe, input_builder, output_parser = build_azure_openai_struct_pipe()
+    struct_pipe, input_builder, output_parser = build_azure_openai_struct_pipe(fsm_config.AZURE_DEPLOYMENT)
     pipe_input = input_builder(
         msgs=state.msg_history,
         struct_model=SearchReasoningNextQuery,
@@ -192,7 +194,7 @@ def prepare_report_sources(
     for page in selected:
         slice_idx = int(len(page.content)*(1-token_overflow_ratio))
         page.content = page.content[:slice_idx]
-        page.content_tokens = count_gemini_tokens(page.content)
+        page.content_tokens = count_gemini_tokens(page.content, fsm_config.GEMINI_MODEL)
 
     token_count = sum(page.content_tokens for page in selected)
     logger.info(f"Total number of content tokens after trimming: {token_count}")
@@ -214,7 +216,7 @@ def prepare_report_sources(
 def generate_report(
     state: ApplicationState,
 ) -> ApplicationState:
-    generator_pipe, input_builder, output_parser = build_gemini_chat_pipe()
+    generator_pipe, input_builder, output_parser = build_gemini_chat_pipe(fsm_config.GEMINI_MODEL)
     pipe_input = input_builder(
         msgs=build_report_generator_msgs(),
         template_variables={

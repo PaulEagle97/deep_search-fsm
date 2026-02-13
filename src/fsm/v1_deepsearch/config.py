@@ -8,6 +8,8 @@ class FSMConfig(BaseModel):
     MAX_NUMBER_SEARCHES: int
     SEARCH_TOKEN_LIMIT: int
     SOURCES_TOKEN_LIMIT: int
+    AZURE_DEPLOYMENT: str
+    GEMINI_MODEL: str
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "FSMConfig":

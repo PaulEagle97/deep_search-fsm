@@ -12,11 +12,11 @@ from haystack_integrations.components.generators.google_genai import GoogleGenAI
 from ..core import openai_config, azure_config, gemini_config
 
 
-def build_openai_chat_pipe() -> Tuple[Pipeline, Callable, Callable]:
+def build_openai_chat_pipe(model: str) -> Tuple[Pipeline, Callable, Callable]:
     prompt_builder = ChatPromptBuilder()
     llm = OpenAIChatGenerator(
         api_key=Secret.from_token(openai_config.API_KEY),
-        model=openai_config.MODELS[0],
+        model=model,
     )
 
     pipe = Pipeline()
@@ -44,12 +44,12 @@ def build_openai_chat_pipe() -> Tuple[Pipeline, Callable, Callable]:
 
 
 
-def build_azure_openai_chat_pipe() -> Tuple[Pipeline, Callable, Callable]:
+def build_azure_openai_chat_pipe(azure_deployment: str) -> Tuple[Pipeline, Callable, Callable]:
     prompt_builder = ChatPromptBuilder()
     llm = AzureOpenAIChatGenerator(
         api_key=Secret.from_token(azure_config.OPENAI_API_KEY),
         azure_endpoint=azure_config.OPENAI_ENDPOINT,
-        azure_deployment=azure_config.DEPLOYMENT_NAMES[1],
+        azure_deployment=azure_deployment,
     )
 
     pipe = Pipeline()
@@ -76,12 +76,12 @@ def build_azure_openai_chat_pipe() -> Tuple[Pipeline, Callable, Callable]:
     return pipe, input, output
 
 
-def build_azure_openai_struct_pipe() -> Tuple[Pipeline, Callable, Callable]:
+def build_azure_openai_struct_pipe(azure_deployment: str) -> Tuple[Pipeline, Callable, Callable]:
     prompt_builder = ChatPromptBuilder()
     llm = AzureOpenAIChatGenerator(
         api_key=Secret.from_token(azure_config.OPENAI_API_KEY),
         azure_endpoint=azure_config.OPENAI_ENDPOINT,
-        azure_deployment=azure_config.DEPLOYMENT_NAMES[0],
+        azure_deployment=azure_deployment,
     )
 
     pipe = Pipeline()
@@ -132,11 +132,11 @@ def build_azure_openai_struct_pipe() -> Tuple[Pipeline, Callable, Callable]:
     return pipe, input, output
 
 
-def build_gemini_chat_pipe() -> Tuple[Pipeline, Callable, Callable]:
+def build_gemini_chat_pipe(model: str) -> Tuple[Pipeline, Callable, Callable]:
     prompt_builder = ChatPromptBuilder()
     llm = GoogleGenAIChatGenerator(
         api_key=Secret.from_token(gemini_config.API_KEY),
-        model=gemini_config.MODELS[0],
+        model=model,
     )
 
     pipe = Pipeline()
@@ -163,11 +163,11 @@ def build_gemini_chat_pipe() -> Tuple[Pipeline, Callable, Callable]:
     return pipe, input, output
 
 
-def build_gemini_struct_pipe() -> Tuple[Pipeline, Callable, Callable]:
+def build_gemini_struct_pipe(model: str) -> Tuple[Pipeline, Callable, Callable]:
     prompt_builder = ChatPromptBuilder()
     llm = GoogleGenAIChatGenerator(
         api_key=Secret.from_token(gemini_config.API_KEY),
-        model=gemini_config.MODELS[1],
+        model=model,
     )
 
     pipe = Pipeline()

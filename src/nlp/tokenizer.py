@@ -14,9 +14,9 @@ def count_openai_tokens(text: str) -> int:
     return len(_openai_encoder.encode(text))
 
 
-def count_gemini_tokens(text: str) -> int:
+def count_gemini_tokens(text: str, model: str) -> int:
     result = _gemini_client.models.count_tokens(
-        model=gemini_config.MODELS[0],
+        model=model,
         contents=text,
     )
     return result.total_tokens

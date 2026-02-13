@@ -10,6 +10,7 @@ from ...tools import search_web_formatted_str_out
 
 class FSMConfig(BaseModel):
     LLM_ITERATIONS_THRESHOLD: int
+    AZURE_DEPLOYMENT: str
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "FSMConfig":

@@ -8,7 +8,7 @@ from haystack.dataclasses import ChatMessage, ChatRole, StreamingCallbackT
 from ...nlp import build_azure_openai_chat_pipe
 from ...tools import init_tool_invoker
 from .models import ApplicationState
-from .config import CURRENT_TOOLS
+from .config import fsm_config, CURRENT_TOOLS
 from .prompt import get_sys_prompt
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def ai_response(
     max_iterations: int,
     streaming_callback: Optional[StreamingCallbackT] = None,
 ) -> ApplicationState:
-    generator_pipe, input_builder, output_parser = build_azure_openai_chat_pipe()
+    generator_pipe, input_builder, output_parser = build_azure_openai_chat_pipe(fsm_config.AZURE_DEPLOYMENT)
     pipe_input = input_builder(
                     msgs=state.chat_history,
                     generator_run_kwargs={
