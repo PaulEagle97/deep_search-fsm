@@ -21,3 +21,6 @@ __pycache__/
 # Environment variables - ignore actual .env files with secrets
 *.env
 !*.env.example
+
+# Evaluation (not part of open-source release)
+evaluation/
