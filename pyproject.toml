@@ -1,7 +1,7 @@
 [project]
 name = "deep_search-fsm"
 version = "0.1.0"
-description = "Default template for PDM package"
+description = "Deep Search systems built with FSM"
 authors = [
     {name = "Pavel Orlov", email = "pauleagle97@gmail.com"},
 ]
